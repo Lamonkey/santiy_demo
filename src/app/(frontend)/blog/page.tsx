@@ -49,7 +49,7 @@ export default async function BlogPage({
     sanityFetch({ query: CATEGORIES_QUERY }),
   ])
 
-  const totalPages = Math.ceil((total ?? 0) / POSTS_PER_PAGE)
+const totalPages = Math.ceil((total ?? 0) / POSTS_PER_PAGE)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
