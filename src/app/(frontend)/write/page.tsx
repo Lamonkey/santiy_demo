@@ -29,7 +29,7 @@ export default function WritePage() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const canSubmit = authorName.trim().length > 0 && title.trim().length > 0 && body.trim().length > 100
+  const canSubmit = authorName.trim().length > 0 && title.trim().length > 0 && body.trim().length > 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -194,9 +194,6 @@ export default function WritePage() {
             <div className="flex items-start justify-between mt-1">
               <p className="text-xs text-gray-400">
                 {body.trim().split(/\s+/).filter(Boolean).length} words
-                {body.trim().length < 100 && (
-                  <span className="ml-2 text-amber-500">Write at least ~100 characters to publish</span>
-                )}
               </p>
               <FieldToolbar value={body} onChange={setBody} />
             </div>
