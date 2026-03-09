@@ -3,6 +3,7 @@ import { structureTool } from 'sanity/structure'
 import { visionTool } from '@sanity/vision'
 import { schemaTypes } from './src/sanity/schemaTypes'
 import { structure } from './src/sanity/structure'
+import { ApproveTranslationAction, RetranslateAction } from './src/sanity/actions/translationActions'
 
 const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!
 const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET!
@@ -16,4 +17,10 @@ export default defineConfig({
     structureTool({ structure }),
     visionTool(),
   ],
+  document: {
+    actions: (prev, context) => {
+      if (context.schemaType !== 'post') return prev
+      return [ApproveTranslationAction, RetranslateAction, ...prev]
+    },
+  },
 })

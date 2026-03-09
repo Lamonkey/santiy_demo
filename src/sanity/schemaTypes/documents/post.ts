@@ -9,6 +9,7 @@ export const postType = defineType({
   groups: [
     { name: 'content', title: 'Content', default: true },
     { name: 'meta', title: 'Metadata' },
+    { name: 'translation', title: 'Translation' },
     { name: 'seo', title: 'SEO' },
   ],
   fields: [
@@ -121,6 +122,59 @@ export const postType = defineType({
       readOnly: true,
     }),
     defineField({
+      name: 'language',
+      title: 'Language',
+      type: 'string',
+      group: 'translation',
+      initialValue: 'en',
+      readOnly: true,
+      options: {
+        list: [
+          { title: 'English', value: 'en' },
+          { title: 'Chinese (Simplified)', value: 'zh' },
+        ],
+      },
+    }),
+    defineField({
+      name: 'translationOf',
+      title: 'Translation Of',
+      description: 'Points to the source document this was translated from',
+      type: 'reference',
+      to: [{ type: 'post' }],
+      group: 'translation',
+      readOnly: true,
+    }),
+    defineField({
+      name: 'translationStatus',
+      title: 'Translation Status',
+      type: 'string',
+      group: 'translation',
+      initialValue: 'none',
+      readOnly: true,
+      options: {
+        list: [
+          { title: 'N/A', value: 'none' },
+          { title: 'Pending Review', value: 'pending_review' },
+          { title: 'Approved', value: 'approved' },
+        ],
+      },
+    }),
+    defineField({
+      name: 'syncStatus',
+      title: 'Sync Status',
+      description: 'Set by the cron job — flags when this document is newer than its translation pair.',
+      type: 'string',
+      group: 'translation',
+      initialValue: 'synced',
+      readOnly: true,
+      options: {
+        list: [
+          { title: 'Synced', value: 'synced' },
+          { title: 'Out of sync', value: 'out_of_sync' },
+        ],
+      },
+    }),
+    defineField({
       name: 'seo',
       title: 'SEO',
       type: 'seo',
@@ -132,10 +186,16 @@ export const postType = defineType({
       title: 'title',
       author: 'author.name',
       media: 'mainImage',
+      language: 'language',
+      translationStatus: 'translationStatus',
+      syncStatus: 'syncStatus',
     },
-    prepare({ title, author, media }) {
+    prepare({ title, author, media, language, translationStatus, syncStatus }) {
+      const lang = language && language !== 'en' ? ` [${language.toUpperCase()}]` : ''
+      const pending = translationStatus === 'pending_review' ? ' ⏳' : ''
+      const outOfSync = syncStatus === 'out_of_sync' ? ' 🔄' : ''
       return {
-        title,
+        title: `${title}${lang}${pending}${outOfSync}`,
         subtitle: author ? `by ${author}` : 'No author',
         media: media ?? DocumentTextIcon,
       }

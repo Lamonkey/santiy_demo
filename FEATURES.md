@@ -15,12 +15,14 @@ A personal portfolio and content platform built with **Sanity.io** and **Next.js
 7. [Live Content API & Visual Editing](#7-live-content-api--visual-editing)
 8. [SEO & Structured Data](#8-seo--structured-data)
 9. [Image Handling](#9-image-handling)
-10. [Public Author Interface with AI Review](#10-public-author-interface-with-ai-review)
+10. [Public Author Interface with Voice Input & AI Editing](#10-public-author-interface-with-voice-input--ai-editing)
 11. [AI-Assisted Content Tools](#11-ai-assisted-content-tools)
-12. [Sanity Blueprints](#12-sanity-blueprints)
-13. [Studio Access Control](#13-studio-access-control)
-14. [Seed Script](#14-seed-script)
-15. [Project Structure](#15-project-structure)
+12. [Multi-Language Support & Translation Workflow](#12-multi-language-support--translation-workflow)
+13. [Translation Sync Cron Job](#13-translation-sync-cron-job)
+14. [Sanity Blueprints](#14-sanity-blueprints)
+15. [Studio Access Control](#15-studio-access-control)
+16. [Seed Script](#16-seed-script)
+17. [Project Structure](#17-project-structure)
 
 ---
 
@@ -318,27 +320,70 @@ const { data } = await sanityFetch({ query: PAGE_QUERY, params, stega: false })
 
 **Sanity feature demonstrated:** GROQ `coalesce()` for fallbacks, Next.js `generateMetadata`, dynamic sitemap, robots.txt, JSON-LD, dynamic OG images.
 
+The full SEO strategy is documented in [`SEO.md`](./SEO.md). Key techniques:
+
+### Server-Side Rendering
+All public pages are Next.js Server Components — content is fully rendered to HTML before reaching the browser, so crawlers receive complete, indexable pages with no JavaScript execution required.
+
+### Static Pre-rendering
+Detail pages use `generateStaticParams` to pre-render every slug at build time and `dynamicParams = false` to return clean 404s for unknown slugs instead of slow dynamic fallbacks:
+```ts
+export const dynamicParams = false
+
+export async function generateStaticParams() {
+  const slugs = await client.fetch(POST_SLUGS_QUERY)
+  return slugs ?? []
+}
+```
+
+### `metadataBase` + Canonical URLs
+`metadataBase` is set in the root layout using `NEXT_PUBLIC_SITE_URL`, making all OG image URLs and canonical links absolute — required for social platform crawlers to resolve them. Every page declares its canonical URL to prevent duplicate content from pagination and category filters.
+
 ### `generateMetadata`
-Used on every dynamic route — never manual `<meta>` tags in components:
+Used on every route — never manual `<meta>` tags in components. Metadata fetches always use `stega: false` to strip Visual Editing characters before writing to `<title>` or `<meta>` tags:
 ```ts
 export async function generateMetadata({ params }): Promise<Metadata> {
   const { data: post } = await getPost(params, false) // stega: false
   return {
     title: post.seo?.title || post.title,
-    description: post.seo?.description,
-    openGraph: { images: [{ url: urlFor(post.seo.image).width(1200).height(630).url() }] },
+    description: post.seo?.description || post.excerpt,
+    alternates: { canonical: `/blog/${slug}` },
+    openGraph: {
+      type: 'article',
+      publishedTime: post.publishedAt,
+      authors: [post.author?.name],
+      images: [{ url: ogImageUrl, width: 1200, height: 630 }],
+    },
   }
 }
 ```
+
+### OG Image Fallback Chain
+For blog posts and case studies, the Open Graph image resolves through a fallback chain so social cards always have an image when one is available:
+1. Dedicated SEO image set in Studio
+2. Post cover image (uploaded via `/write` or Studio)
+3. No image (card renders title-only)
 
 ### Dynamic Sitemap
 `src/app/sitemap.ts` queries Sanity directly and generates `sitemap.xml` from live content — automatically includes new posts and case studies as they're published.
 
 ### JSON-LD Structured Data
-`src/components/BlogJsonLd.tsx` injects `Article` schema markup on every blog post using the `schema-dts` library for type safety.
+`src/components/BlogJsonLd.tsx` injects `Article` schema markup on every blog post using the `schema-dts` library for type safety — enables rich results (article carousels, author bylines) in Google Search.
 
 ### Dynamic OG Images
 `/api/og?id=<documentId>` generates 1200×630 Open Graph images at the edge using `next/og` — used as a fallback when a post has no manually uploaded image.
+
+### GROQ `coalesce()` for SEO Fallbacks
+Fallback logic lives in the query, not in component code:
+```groq
+"seo": {
+  "title":       coalesce(seo.title, title, ""),
+  "description": coalesce(seo.description, excerpt, "")
+}
+```
+
+### `noIndex` Flag
+Every content type has a `noIndex` boolean editors can toggle in Studio — emits `robots: 'noindex'` without any code changes.
 
 ---
 
@@ -424,7 +469,7 @@ LQIP (Low Quality Image Placeholder) is fetched in GROQ via `metadata { lqip, di
 
 ---
 
-## 10. Public Author Interface with AI Review
+## 10. Public Author Interface with Voice Input & AI Editing
 
 **Sanity feature demonstrated:** Sanity client write operations from a Next.js API route, programmatic document creation, find-or-create author pattern, `client.assets.upload()` from a public form.
 
@@ -432,22 +477,48 @@ LQIP (Low Quality Image Placeholder) is fetched in GROQ via `metadata { lqip, di
 A public-facing form — no login required — where anyone can write and publish a blog post directly to the site.
 
 **Two-column layout:**
-- Left: writing form (name, title, excerpt, body with live word count, optional cover image)
-- Right: sticky AI feedback panel
+- Left: writing form (name, title, excerpt, body, voice recorder)
+- Right: sticky AI editing assistant
 
-### Optional Cover Image Upload
-Contributors can attach a cover image directly from the form. A file picker with instant client-side preview is shown before upload:
+### Voice Input with OpenAI Whisper
+Contributors can dictate their article instead of typing. The browser records audio via the `MediaRecorder` API and sends it to `/api/transcribe`, which calls OpenAI Whisper (`whisper-1`). The transcribed text is appended to the body field.
 
-```tsx
-// src/app/(frontend)/write/page.tsx
-function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0] ?? null
-  setImageFile(file)
-  if (file) setImagePreview(URL.createObjectURL(file))
+```ts
+// src/app/api/transcribe/route.ts
+const transcription = await openai.audio.transcriptions.create({
+  model: 'whisper-1',
+  file: audio,
+})
+```
+
+**Recording retention** — the audio blob is kept in memory after transcription. An `<audio>` player and a download link remain visible so contributors can replay the recording and verify accuracy. If transcription fails, the recording can be downloaded and used manually.
+
+### AI Editing Assistant
+Instead of passive feedback, contributors give the AI a direct editing instruction. The AI rewrites the entire body and presents the result for review — the contributor then accepts or discards it.
+
+```ts
+// src/app/api/ai-assist/route.ts (edit mode)
+{
+  role: 'system',
+  content: 'Apply the given instruction to the article content. Return only the edited content.',
+},
+{
+  role: 'user',
+  content: `Instruction: ${instruction}\n\nContent:\n${content}`,
 }
 ```
 
-The image is included in the `FormData` submission and processed server-side — compressed if needed, then uploaded to Sanity's asset store (see Section 9).
+Example instructions shown as quick-select buttons in the UI:
+- "Fix grammar and improve flow"
+- "Make this 30% shorter"
+- "Add a stronger introduction"
+- "Rewrite in a friendlier tone"
+- "Add subheadings to structure this"
+
+The suggested rewrite appears in a read-only preview panel. The contributor clicks **Accept Changes** to replace the body, or **Discard** to keep the original.
+
+### Optional Cover Image Upload
+Contributors can attach a cover image directly from the form. A file picker with instant client-side preview is shown before upload. The image is processed server-side — compressed if needed, then uploaded to Sanity's asset store (see Section 9).
 
 ### Programmatic Publishing
 The form submits to `/api/posts/create`, which:
@@ -474,36 +545,221 @@ Posts are created without the `drafts.` prefix — they publish immediately and 
 
 ## 11. AI-Assisted Content Tools
 
-**Sanity feature demonstrated:** AI integration with the content pipeline via API routes, `aiSummary` field on post schema.
+**Sanity feature demonstrated:** AI integration with the content pipeline via API routes, `aiSummary` field on post schema, OpenAI Whisper speech-to-text.
 
-The AI endpoint (`/api/ai-assist`) uses OpenAI `gpt-4o` and supports three modes:
+Two AI endpoints power the author experience:
+
+### `/api/transcribe` — Voice-to-Text (Whisper)
+Accepts a raw audio blob from the browser's `MediaRecorder` and calls OpenAI Whisper `whisper-1` to transcribe it. The transcription is appended to the article body. The original recording is always retained client-side so contributors can verify or download it if transcription is inaccurate.
+
+### `/api/ai-assist` — Content Tools (GPT-4o)
 
 | Mode | Input | Output | Used In |
 |---|---|---|---|
 | `summary` | Post body | 2-3 sentence summary | Studio action (stored in `aiSummary` field) |
 | `seo` | Post content | `{ title, description }` JSON | Studio SEO helper |
-| `review` | Title + excerpt + body | Structured editorial feedback | `/write` author form |
+| `edit` | Body + instruction | Rewritten body text | `/write` AI editing assistant |
 
-### AI Review Response Shape
-```json
-{
-  "score": 8,
-  "summary": "A well-structured introduction to the topic with clear examples.",
-  "strengths": ["Clear structure", "Good use of examples"],
-  "improvements": [
-    { "area": "Conclusion", "suggestion": "Add a concrete call to action" }
-  ],
-  "seoTips": ["Include the target keyword in the first paragraph"],
-  "readability": "Good",
-  "verdict": "Ready to submit"
-}
-```
-
-The verdict drives a colour-coded badge in the UI: green for ready, amber for minor edits, red for major revision — giving authors actionable guidance before they publish.
+The `edit` mode takes a free-form instruction ("make this more concise", "add subheadings") and rewrites the entire article body. The result is shown in a preview panel — contributors explicitly accept or discard it, keeping full control over the final content.
 
 ---
 
-## 12. Sanity Blueprints
+## 12. Multi-Language Support & Translation Workflow
+
+**Sanity feature demonstrated:** Separate documents per locale linked via `reference`, custom `document.actions`, GROQ reverse reference joins, programmatic draft creation, human review workflow.
+
+### Architecture: Separate Documents Per Language
+
+Each language version is its own `post` document — not duplicate fields on the same document. This scales cleanly to N languages without ever touching the schema again.
+
+| Field | Type | Purpose |
+|---|---|---|
+| `language` | `string` (`en` \| `zh`) | Which locale this document is |
+| `translationOf` | `reference → post` | Points from the translation back to the source |
+| `translationStatus` | `string` | `none` \| `pending_review` \| `approved` |
+| `syncStatus` | `string` | `synced` \| `out_of_sync` (set by cron, see Section 13) |
+
+All four fields are `readOnly: true` in the schema — they are only ever set programmatically, never by editors directly.
+
+### Auto-Translation on Submit
+
+When a contributor publishes via `/write`, the API creates the English post immediately (synchronously) and then runs translation in the background — the author's form response is never delayed:
+
+```ts
+// src/app/api/posts/create/route.ts
+const post = await client.create({ ...englishFields, language: 'en' })
+
+// Non-blocking — fires and forgets, errors are logged server-side
+createTranslation({ sourceId: post._id, ...fields }).catch(console.error)
+
+return NextResponse.json({ success: true, id: post._id })
+```
+
+The `createTranslation` function calls GPT-4o with `response_format: { type: 'json_object' }` to translate `title`, `excerpt`, and `body` in a single structured call:
+
+```ts
+const completion = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  response_format: { type: 'json_object' },
+  messages: [{
+    role: 'system',
+    content: 'Translate the given fields to Simplified Chinese. Return JSON: { title, excerpt, body }.',
+  }, {
+    role: 'user',
+    content: JSON.stringify({ title, excerpt, body }),
+  }],
+})
+```
+
+### Translation Created as a Draft
+
+The translated document is created with `_id: 'drafts.{sourceId}-zh'` — Sanity's native draft prefix. It appears in the Studio drafts list automatically, requiring no custom UI to surface it for review:
+
+```ts
+await client.createOrReplace({
+  _id: `drafts.${sourceId}-zh`,
+  _type: 'post',
+  language: 'zh',
+  translationOf: { _type: 'reference', _ref: sourceId },
+  translationStatus: 'pending_review',
+  ...translatedFields,
+})
+```
+
+A webhook notification is fired to `REVIEW_WEBHOOK_URL` with the Studio deep-link so the reviewer goes directly to the pending draft.
+
+### Studio Preview Badges
+
+The post `preview.prepare` function reads `language`, `translationStatus`, and `syncStatus` to add badges directly in the Studio document list — no custom plugin needed:
+
+```
+My Article [ZH] ⏳       ← pending review
+My Article [ZH] 🔄       ← approved but out of sync
+My Article                ← English source, no badge
+```
+
+### Custom Document Actions
+
+Two custom actions are registered on all `post` documents via `document.actions` in `sanity.config.ts`:
+
+```ts
+// sanity.config.ts
+document: {
+  actions: (prev, context) => {
+    if (context.schemaType !== 'post') return prev
+    return [ApproveTranslationAction, RetranslateAction, ...prev]
+  },
+},
+```
+
+**`ApproveTranslationAction`** — only visible when `translationStatus === 'pending_review'`. Clicking it:
+1. Calls `publish.execute()` from `useDocumentOperation` — publishes the draft
+2. Patches `translationStatus` to `'approved'` on the now-published document
+
+**`RetranslateAction`** — visible on all published posts. The label auto-detects direction:
+- On an English post → **"Re-translate → ZH"**
+- On a Chinese post → **"Re-translate → EN"**
+
+Clicking calls `PUT /api/posts/create` which reads the current document from Sanity, translates it, and creates a new `pending_review` draft of the other language — enabling true bidirectional sync on demand.
+
+### Why Not the `@sanity/document-internationalization` Plugin?
+
+The official plugin is a great choice for most projects. Here a manual approach was chosen deliberately to demonstrate the underlying Sanity primitives: `reference` fields for linking, programmatic draft creation, and custom `document.actions`. The same concepts power the plugin under the hood.
+
+---
+
+## 13. Translation Sync Cron Job
+
+**Sanity feature demonstrated:** Vercel Cron Jobs calling a protected Next.js API route, GROQ reverse reference joins with `^._id`, Sanity transactions for batch patching.
+
+### What It Checks
+
+After a translation is approved, editors may continue updating the English source. The cron job detects drift by comparing `_updatedAt` timestamps on linked document pairs.
+
+### Schedule
+
+Defined in `vercel.json` — Vercel automatically injects `Authorization: Bearer {CRON_SECRET}` when calling the route:
+
+```json
+{
+  "crons": [{ "path": "/api/cron/sync-check", "schedule": "0 */6 * * *" }]
+}
+```
+
+Runs every 6 hours. The route returns `401` for any call without the correct bearer token.
+
+### GROQ Reverse Reference Join
+
+A single query fetches all English posts and their linked Chinese translations using GROQ's `^._id` self-reference pattern:
+
+```groq
+*[_type == "post" && language == "en"] {
+  _id,
+  _updatedAt,
+  title,
+  syncStatus,
+  "zhTranslation": *[
+    _type == "post" &&
+    translationOf._ref == ^._id &&
+    language == "zh"
+  ][0] {
+    _id,
+    _updatedAt,
+    translationStatus,
+    syncStatus
+  }
+}
+```
+
+### Sync Logic
+
+```
+EN _updatedAt > ZH _updatedAt  AND  ZH translationStatus == 'approved'
+→ mark both documents syncStatus: 'out_of_sync'
+
+EN _updatedAt <= ZH _updatedAt  AND  either was previously 'out_of_sync'
+→ clear both back to syncStatus: 'synced'
+```
+
+Only `approved` translations are checked — `pending_review` ones are intentionally behind and would generate false-positive noise.
+
+### Batch Patching via Transaction
+
+All mutations are batched into a single Sanity transaction per run to minimise API calls:
+
+```ts
+const tx = client.transaction()
+for (const pair of outOfSync) {
+  tx.patch(pair.enId, (p) => p.set({ syncStatus: 'out_of_sync' }))
+  tx.patch(pair.zhId, (p) => p.set({ syncStatus: 'out_of_sync' }))
+}
+await tx.commit()
+```
+
+### Developer Notification
+
+If any pairs are out of sync, a webhook fires to `REVIEW_WEBHOOK_URL` with a formatted list of affected posts and their Studio links. The developer then uses the **"Re-translate"** document action to queue a new pending draft.
+
+### Testing Locally
+
+```bash
+curl -H "Authorization: Bearer your-cron-secret" \
+  http://localhost:3000/api/cron/sync-check
+```
+
+Returns:
+```json
+{
+  "checked": 5,
+  "outOfSync": 1,
+  "resynced": 0,
+  "details": [{ "enId": "...", "zhId": "...", "title": "...", "enUpdated": "...", "zhUpdated": "..." }]
+}
+```
+
+---
+
+## 14. Sanity Blueprints
 
 **Sanity feature demonstrated:** Infrastructure as Code, `defineBlueprint`, `defineDocumentFunction`, declarative resource management.
 
@@ -527,7 +783,7 @@ Blueprints treat Sanity infrastructure (webhooks, functions, datasets, CORS orig
 
 ---
 
-## 13. Studio Access Control
+## 15. Studio Access Control
 
 **Sanity feature demonstrated:** Protecting the embedded Studio route from public access using Next.js middleware.
 
@@ -553,7 +809,7 @@ Public content contributors use `/write` — they never need Studio access.
 
 ---
 
-## 14. Seed Script
+## 16. Seed Script
 
 `scripts/seed.mjs` populates a fresh Sanity dataset with realistic fixture data using only Node.js built-ins and `@sanity/client` — no extra dependencies.
 
@@ -571,15 +827,16 @@ Requires a `SANITY_API_WRITE_TOKEN` with **Editor** role in `.env.local`.
 
 ---
 
-## 15. Project Structure
+## 17. Project Structure
 
 ```
 santiy_demo/
 ├── middleware.ts                        # Studio Basic Auth protection
-├── sanity.config.ts                     # Studio config (plugins, schema, structure)
+├── sanity.config.ts                     # Studio config + custom document actions
 ├── sanity.cli.ts                        # CLI + TypeGen configuration
 ├── sanity.blueprint.ts                  # Infrastructure as Code (Blueprints)
 ├── sanity.types.ts                      # Auto-generated TypeScript types (TypeGen)
+├── vercel.json                          # Cron job schedule
 ├── scripts/
 │   └── seed.mjs                         # Dataset seeding script
 └── src/
@@ -594,13 +851,15 @@ santiy_demo/
     │   │   │   ├── page.tsx             # Case studies grid
     │   │   │   └── [slug]/page.tsx      # Case study detail
     │   │   └── write/
-    │   │       └── page.tsx             # Public author form with AI review
+    │   │       └── page.tsx             # Public author form (voice + AI editing)
     │   ├── studio/[[...tool]]/
     │   │   ├── page.tsx                 # Studio route (metadata, server)
     │   │   └── Studio.tsx               # NextStudio client component
     │   ├── api/
-    │   │   ├── ai-assist/route.ts       # OpenAI: summary / seo / review
-    │   │   ├── posts/create/route.ts    # Programmatic post creation
+    │   │   ├── ai-assist/route.ts       # OpenAI: summary / seo / edit
+    │   │   ├── transcribe/route.ts      # Whisper voice transcription
+    │   │   ├── posts/create/route.ts    # Post creation + auto-translation (PUT = retranslate)
+    │   │   ├── cron/sync-check/route.ts # Translation sync cron endpoint
     │   │   ├── draft-mode/enable/       # Draft Mode activation
     │   │   ├── revalidate/tag/          # Webhook tag revalidation
     │   │   └── og/route.tsx             # Dynamic OG image (Edge)
@@ -619,6 +878,8 @@ santiy_demo/
     │   ├── Pagination.tsx
     │   ├── Nav.tsx
     │   └── BlogJsonLd.tsx               # JSON-LD Article schema
+    ├── components/
+    │   └── FieldToolbar.tsx             # Reusable mic + polish AI toolbar for text fields
     └── sanity/
         ├── lib/
         │   ├── client.ts                # createClient (with stega config)
@@ -626,8 +887,10 @@ santiy_demo/
         │   ├── image.ts                 # urlFor image builder
         │   ├── token.ts                 # Server-only read token
         │   └── queries.ts              # All GROQ queries (defineQuery)
+        ├── actions/
+        │   └── translationActions.tsx   # ApproveTranslation + Retranslate document actions
         ├── schemaTypes/
-        │   ├── documents/               # post, author, category, caseStudy, settings, landingPage
+        │   ├── documents/               # post (+ translation fields), author, category, caseStudy, settings, landingPage
         │   ├── objects/                 # seo, link
         │   └── blocks/                 # hero, features, testimonials, pageBuilder
         └── structure/
@@ -647,7 +910,10 @@ santiy_demo/
 | `SANITY_API_WRITE_TOKEN` | Yes | Editor token — public post creation + seed script |
 | `SANITY_REVALIDATE_SECRET` | Yes | Shared secret for webhook signature verification |
 | `STUDIO_ACCESS_KEY` | Yes | Password for `/studio` Basic Auth |
-| `OPENAI_API_KEY` | Yes | Powers AI review, summary, and SEO generation |
+| `OPENAI_API_KEY` | Yes | Powers editing assistant, voice transcription, translation, summary, SEO |
+| `NEXT_PUBLIC_SITE_URL` | Yes | Production domain — used in `metadataBase` and Studio deep-links in notifications |
+| `REVIEW_WEBHOOK_URL` | Optional | Webhook URL (Slack/Discord/etc.) for translation review and sync-drift notifications |
+| `CRON_SECRET` | Yes (prod) | Bearer token Vercel injects when calling the cron route — prevents public access |
 
 ---
 
@@ -680,5 +946,22 @@ santiy_demo/
 | `client.assets.upload()` | `/api/posts/create/route.ts` |
 | Server-side image compression (`sharp`) | `/api/posts/create/route.ts` — >10 MB uploads |
 | Programmatic document creation | `/api/posts/create/route.ts` |
+| OpenAI Whisper voice transcription | `/api/transcribe/route.ts` |
+| AI editing assistant (free-form instruction → rewrite) | `/api/ai-assist/route.ts` (`edit` mode) |
+| Multi-locale separate documents (`language`, `translationOf`) | `post.ts` schema — translation fields |
+| Programmatic draft creation (`drafts.` prefix) | `/api/posts/create/route.ts` — translation flow |
+| GROQ reverse reference join (`^._id`) | `/api/cron/sync-check/route.ts` |
+| Custom `document.actions` (Approve + Retranslate) | `sanity/actions/translationActions.tsx` + `sanity.config.ts` |
+| `useDocumentOperation` (`publish.execute()`) | `ApproveTranslationAction` |
+| Sanity transaction (batch patches) | `/api/cron/sync-check/route.ts` |
+| Vercel Cron Job (scheduled API route) | `vercel.json` + `/api/cron/sync-check/route.ts` |
+| Webhook notification (translation review + sync drift) | `createTranslation()` + cron route |
 | Sanity Blueprints | `sanity.blueprint.ts` |
 | Embedded Studio in Next.js | `src/app/studio/[[...tool]]/` |
+| `generateStaticParams` + `dynamicParams = false` | `blog/[slug]`, `case-studies/[slug]` |
+| `metadataBase` + canonical URLs | Root layout + all page metadata |
+| `openGraph.type: 'article'` + `publishedTime` | Blog post + case study metadata |
+| OG image fallback chain (SEO → cover → none) | Blog post + case study `generateMetadata` |
+| JSON-LD `Article` schema | `BlogJsonLd.tsx` |
+| Dynamic sitemap | `app/sitemap.ts` |
+| `noIndex` per document | `post.seo.noIndex`, `caseStudy.seo.noIndex` |
