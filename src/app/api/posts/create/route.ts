@@ -41,6 +41,23 @@ function portableTextToPlain(blocks: Array<{ _type: string; children?: Array<{ t
     .join('\n\n')
 }
 
+async function generateSeo(title: string, bodyText: string): Promise<{ title: string; description: string }> {
+  const text = [title, bodyText].filter(Boolean).join('\n\n').slice(0, 3000)
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: 'Generate an SEO meta title (max 60 characters) and meta description (max 155 characters). Return JSON with keys "title" and "description". Be factual, no marketing language.',
+      },
+      { role: 'user', content: text },
+    ],
+  })
+  const result = JSON.parse(completion.choices[0].message.content ?? '{}')
+  return { title: result.title ?? '', description: result.description ?? '' }
+}
+
 async function translateContent(title: string, bodyText: string, targetLanguage: string) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -118,6 +135,9 @@ export async function POST(req: NextRequest) {
       authorId = newAuthor._id
     }
 
+    // Generate SEO for English post
+    const seo = await generateSeo(title, body).catch(() => null)
+
     // Create source (English) post — published immediately
     const post = await client.create({
       _type: 'post',
@@ -128,6 +148,7 @@ export async function POST(req: NextRequest) {
       publishedAt: new Date().toISOString(),
       language: 'en',
       translationStatus: 'none',
+      ...(seo && { seo }),
       ...(mainImage && { mainImage }),
     })
 
@@ -170,7 +191,10 @@ async function createTranslation({
   targetLocale: string
   siteUrl: string
 }) {
-  const translated = await translateContent(title, body, targetLanguage)
+  const [translated, translatedSeo] = await Promise.all([
+    translateContent(title, body, targetLanguage),
+    generateSeo(title, body).catch(() => null),
+  ])
 
   const translationId = `${sourceId}-${targetLocale}`
   const draftId = `drafts.${translationId}`
@@ -186,6 +210,7 @@ async function createTranslation({
     language: targetLocale,
     translationOf: { _type: 'reference', _ref: sourceId },
     translationStatus: 'pending_review',
+    ...(translatedSeo && { seo: translatedSeo }),
     ...(mainImage && { mainImage }),
   })
 
