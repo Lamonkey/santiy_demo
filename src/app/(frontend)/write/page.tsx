@@ -58,6 +58,13 @@ export default function WritePage() {
           <div className="text-5xl mb-6">🎉</div>
           <h1 className="text-3xl font-bold mb-3">Article Published!</h1>
           <p className="text-gray-600 mb-6">Your article is now live. Head over to the blog to see it.</p>
+          <div className="flex gap-3 justify-center">
+          <a
+            href="/blog"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            View Blog
+          </a>
           <button
             onClick={() => {
               setAuthorName(''); setTitle(''); setExcerpt(''); setBody('')
@@ -67,6 +74,7 @@ export default function WritePage() {
           >
             Write Another Article
           </button>
+          </div>
         </div>
       </div>
     )
