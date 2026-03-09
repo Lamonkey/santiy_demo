@@ -7,7 +7,7 @@ import {
   TagIcon,
 } from '@sanity/icons'
 
-const SINGLETONS = ['settings', 'landingPage']
+const SINGLETONS = ['settings', 'landingPage', 'landingPageZh']
 
 export const structure: StructureResolver = (S) =>
   S.list()
@@ -23,6 +23,11 @@ export const structure: StructureResolver = (S) =>
         .title('Landing Page')
         .icon(HomeIcon)
         .child(S.document().schemaType('landingPage').documentId('landingPage')),
+
+      S.listItem()
+        .title('Landing Page (Chinese)')
+        .icon(HomeIcon)
+        .child(S.document().schemaType('landingPage').documentId('landingPageZh')),
 
       S.divider(),
 

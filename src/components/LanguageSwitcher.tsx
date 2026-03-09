@@ -9,7 +9,7 @@ export default function LanguageSwitcher() {
 
   const targetPath = isZh
     ? pathname.replace(/^\/zh/, '') || '/'
-    : `/zh${pathname}`
+    : `/zh${pathname}`.replace(/\/$/, '') || '/zh'
 
   return (
     <Link

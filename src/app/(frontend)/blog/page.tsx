@@ -52,9 +52,10 @@ export default async function BlogPage({
     fetchClient.fetch(
       categorySlug ? POSTS_BY_CATEGORY_QUERY : POSTS_LIST_QUERY,
       categorySlug ? { categorySlug, start, end } : { start, end },
+      { next: { tags: ['post', 'category'] } },
     ),
-    fetchClient.fetch(POSTS_COUNT_QUERY),
-    fetchClient.fetch(CATEGORIES_QUERY),
+    fetchClient.fetch(POSTS_COUNT_QUERY, {}, { next: { tags: ['post'] } }),
+    fetchClient.fetch(CATEGORIES_QUERY, {}, { next: { tags: ['category'] } }),
   ])
 
   const totalPages = Math.ceil((total ?? 0) / POSTS_PER_PAGE)

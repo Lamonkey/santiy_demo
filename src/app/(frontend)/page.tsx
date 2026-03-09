@@ -1,14 +1,15 @@
 import type { Metadata } from 'next'
-import { sanityFetch } from '@/sanity/lib/live'
+import { client } from '@/sanity/lib/client'
 import { LANDING_PAGE_QUERY } from '@/sanity/lib/queries'
-import { notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import PageBuilder from '@/components/PageBuilder'
 
-const getLandingPage = (stega = true) =>
-  sanityFetch({ query: LANDING_PAGE_QUERY, stega })
+export const revalidate = 60
+
+const fetchClient = client.withConfig({ useCdn: false, token: process.env.SANITY_API_READ_TOKEN })
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { data: page } = await getLandingPage(false)
+  const page = await fetchClient.fetch(LANDING_PAGE_QUERY)
   if (!page) return {}
   return {
     title: page.seo?.title || undefined,
@@ -20,8 +21,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const { data: page } = await getLandingPage()
-  if (!page) notFound()
+  const page = await fetchClient.fetch(LANDING_PAGE_QUERY, {}, { next: { tags: ['landingPage'] } })
+  if (!page) redirect('/blog')
 
   return <PageBuilder blocks={page.pageBuilder ?? []} documentId="landingPage" />
 }

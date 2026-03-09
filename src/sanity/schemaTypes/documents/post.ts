@@ -1,5 +1,6 @@
 import { defineArrayMember, defineField, defineType } from 'sanity'
 import { DocumentTextIcon } from '@sanity/icons'
+import { AiTextInput } from '../../components/AiTextInput'
 
 export const postType = defineType({
   name: 'post',
@@ -19,6 +20,7 @@ export const postType = defineType({
       type: 'string',
       group: 'content',
       validation: (rule) => rule.required(),
+      components: { input: AiTextInput },
     }),
     defineField({
       name: 'slug',
@@ -27,15 +29,6 @@ export const postType = defineType({
       options: { source: 'title' },
       group: 'content',
       validation: (rule) => rule.required(),
-    }),
-    defineField({
-      name: 'excerpt',
-      title: 'Excerpt',
-      description: 'Short summary for listings and SEO fallback',
-      type: 'text',
-      rows: 3,
-      group: 'content',
-      validation: (rule) => rule.max(200).warning('Keep under 200 characters'),
     }),
     defineField({
       name: 'mainImage',

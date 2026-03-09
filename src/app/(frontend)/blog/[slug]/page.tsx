@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PostPage({ params }: Props) {
   const resolvedParams = await params
-  const post = await fetchClient.fetch(POST_QUERY, resolvedParams)
+  const post = await fetchClient.fetch(POST_QUERY, resolvedParams, { next: { tags: [`post:${resolvedParams.slug}`, 'post'] } })
   if (!post) notFound()
 
   return (
