@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { sanityFetch } from '@/sanity/lib/live'
 import { POST_QUERY, POST_SLUGS_QUERY } from '@/sanity/lib/queries'
 import { urlFor } from '@/sanity/lib/image'
 import { client } from '@/sanity/lib/client'
@@ -10,19 +9,21 @@ import Image from 'next/image'
 
 type Props = { params: Promise<{ slug: string }> }
 
-export const dynamicParams = false
+export const revalidate = 60
 
-const getPost = (params: Props['params'], stega = true) =>
-  sanityFetch({ query: POST_QUERY, params: params as unknown as { slug: string }, stega })
+const fetchClient = client.withConfig({
+  useCdn: false,
+  token: process.env.SANITY_API_READ_TOKEN,
+})
 
 export async function generateStaticParams() {
-  const slugs = await client.withConfig({ useCdn: false }).fetch(POST_SLUGS_QUERY)
+  const slugs = await fetchClient.fetch(POST_SLUGS_QUERY)
   return slugs ?? []
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const resolvedParams = await params
-  const { data: post } = await getPost(params, false)
+  const post = await fetchClient.fetch(POST_QUERY, resolvedParams)
   if (!post) return {}
   const ogImage = post.seo?.image
     ? urlFor(post.seo.image).width(1200).height(630).url()
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PostPage({ params }: Props) {
   const resolvedParams = await params
-  const { data: post } = await sanityFetch({ query: POST_QUERY, params: resolvedParams })
+  const post = await fetchClient.fetch(POST_QUERY, resolvedParams)
   if (!post) notFound()
 
   return (
@@ -95,7 +96,7 @@ export default async function PostPage({ params }: Props) {
             {post.publishedAt && (
               <time className="ml-auto text-sm text-gray-500">
                 {new Date(post.publishedAt).toLocaleDateString('en-US', {
-                  year: 'numeric', month: 'long', day: 'numeric'
+                  year: 'numeric', month: 'long', day: 'numeric',
                 })}
               </time>
             )}

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { sanityFetch } from '@/sanity/lib/live'
+import { client } from '@/sanity/lib/client'
 import {
   POSTS_LIST_QUERY,
   POSTS_BY_CATEGORY_QUERY,
@@ -12,6 +12,13 @@ import CategoryFilter from '@/components/CategoryFilter'
 import Link from 'next/link'
 
 const POSTS_PER_PAGE = 9
+
+const fetchClient = client.withConfig({
+  useCdn: false,
+  token: process.env.SANITY_API_READ_TOKEN,
+})
+
+export const revalidate = 60
 
 export async function generateMetadata({
   searchParams,
@@ -41,15 +48,16 @@ export default async function BlogPage({
   const start = (page - 1) * POSTS_PER_PAGE
   const end = start + POSTS_PER_PAGE
 
-  const [{ data: posts }, { data: total }, { data: categories }] = await Promise.all([
-    categorySlug
-      ? sanityFetch({ query: POSTS_BY_CATEGORY_QUERY, params: { categorySlug, start, end } })
-      : sanityFetch({ query: POSTS_LIST_QUERY, params: { start, end } }),
-    sanityFetch({ query: POSTS_COUNT_QUERY }),
-    sanityFetch({ query: CATEGORIES_QUERY }),
+  const [posts, total, categories] = await Promise.all([
+    fetchClient.fetch(
+      categorySlug ? POSTS_BY_CATEGORY_QUERY : POSTS_LIST_QUERY,
+      categorySlug ? { categorySlug, start, end } : { start, end },
+    ),
+    fetchClient.fetch(POSTS_COUNT_QUERY),
+    fetchClient.fetch(CATEGORIES_QUERY),
   ])
 
-const totalPages = Math.ceil((total ?? 0) / POSTS_PER_PAGE)
+  const totalPages = Math.ceil((total ?? 0) / POSTS_PER_PAGE)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
