@@ -13,10 +13,7 @@ type Settings = {
 
 function getNavHref(item: NonNullable<NonNullable<Settings>['nav']>[number]): string {
   if (item.linkType === 'external') return item.externalUrl || '#'
-  if (item.internalRef?.slug?.current) {
-    const prefix = item.internalRef._type === 'post' ? '/blog' : '/case-studies'
-    return `${prefix}/${item.internalRef.slug.current}`
-  }
+  if (item.internalRef?.slug?.current) return `/blog/${item.internalRef.slug.current}`
   return '#'
 }
 
@@ -30,9 +27,6 @@ export default function Nav({ settings }: { settings: Settings }) {
         <div className="flex items-center gap-6">
           <Link href="/blog" className="text-gray-600 hover:text-gray-900 transition text-sm">
             Blog
-          </Link>
-          <Link href="/case-studies" className="text-gray-600 hover:text-gray-900 transition text-sm">
-            Case Studies
           </Link>
           {settings?.nav?.map((item, i) => (
             <a

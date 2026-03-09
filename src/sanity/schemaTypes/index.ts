@@ -9,7 +9,6 @@ import { landingPageType } from './documents/landing-page'
 import { authorType } from './documents/author'
 import { categoryType } from './documents/category'
 import { postType } from './documents/post'
-import { caseStudyType } from './documents/case-study'
 
 export const schemaTypes = [
   // Objects
@@ -28,5 +27,4 @@ export const schemaTypes = [
   authorType,
   categoryType,
   postType,
-  caseStudyType,
 ]

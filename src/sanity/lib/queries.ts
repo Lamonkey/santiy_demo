@@ -72,7 +72,7 @@ export const LANDING_PAGE_QUERY = defineQuery(`
 
 // Blog listing
 export const POSTS_LIST_QUERY = defineQuery(`
-  *[_type == "post" && defined(slug.current)] | order(featured desc, publishedAt desc) [$start...$end] {
+  *[_type == "post" && defined(slug.current) && (language == "en" || !defined(language))] | order(featured desc, publishedAt desc) [$start...$end] {
     _id,
     title,
     "slug": slug.current,
@@ -86,11 +86,11 @@ export const POSTS_LIST_QUERY = defineQuery(`
 `)
 
 export const POSTS_COUNT_QUERY = defineQuery(`
-  count(*[_type == "post" && defined(slug.current)])
+  count(*[_type == "post" && defined(slug.current) && (language == "en" || !defined(language))])
 `)
 
 export const POSTS_BY_CATEGORY_QUERY = defineQuery(`
-  *[_type == "post" && defined(slug.current) && $categorySlug in categories[]->slug.current]
+  *[_type == "post" && defined(slug.current) && (language == "en" || !defined(language)) && $categorySlug in categories[]->slug.current]
   | order(publishedAt desc) [$start...$end] {
     _id,
     title,
@@ -129,51 +129,7 @@ export const POST_QUERY = defineQuery(`
 `)
 
 export const POST_SLUGS_QUERY = defineQuery(`
-  *[_type == "post" && defined(slug.current)]{ "slug": slug.current }
-`)
-
-// Case studies
-export const CASE_STUDIES_LIST_QUERY = defineQuery(`
-  *[_type == "caseStudy" && defined(slug.current)] | order(publishedAt desc) {
-    _id,
-    title,
-    "slug": slug.current,
-    excerpt,
-    client,
-    industry,
-    services,
-    technologies,
-    publishedAt,
-    coverImage { ${imageFragment} }
-  }
-`)
-
-export const CASE_STUDY_QUERY = defineQuery(`
-  *[_type == "caseStudy" && slug.current == $slug][0]{
-    _id,
-    title,
-    "slug": slug.current,
-    excerpt,
-    client,
-    industry,
-    services,
-    technologies,
-    projectUrl,
-    publishedAt,
-    coverImage { ${imageFragment} },
-    body[]{
-      ...,
-      _type == "image" => {
-        ...,
-        asset->{ _id, url, metadata { lqip, dimensions } }
-      }
-    },
-    ${seoFragment}
-  }
-`)
-
-export const CASE_STUDY_SLUGS_QUERY = defineQuery(`
-  *[_type == "caseStudy" && defined(slug.current)]{ "slug": slug.current }
+  *[_type == "post" && defined(slug.current) && (language == "en" || !defined(language))]{ "slug": slug.current }
 `)
 
 // Categories
@@ -188,12 +144,8 @@ export const CATEGORIES_QUERY = defineQuery(`
 
 // Sitemap
 export const SITEMAP_QUERY = defineQuery(`
-  *[_type in ["post", "caseStudy"] && defined(slug.current) && seo.noIndex != true] {
-    "href": select(
-      _type == "post" => "/blog/" + slug.current,
-      _type == "caseStudy" => "/case-studies/" + slug.current,
-      "/" + slug.current
-    ),
+  *[_type == "post" && defined(slug.current) && (language == "en" || !defined(language)) && seo.noIndex != true] {
+    "href": "/blog/" + slug.current,
     _updatedAt
   }
 `)
