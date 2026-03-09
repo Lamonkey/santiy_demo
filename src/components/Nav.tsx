@@ -39,6 +39,9 @@ export default function Nav({ settings }: { settings: Settings }) {
               {item.label}
             </a>
           ))}
+          <Link href="/studio" className="text-gray-600 hover:text-gray-900 transition text-sm">
+            Admin
+          </Link>
           <Link
             href="/write"
             className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"

@@ -9,7 +9,6 @@ type SubmitStatus = 'idle' | 'submitting' | 'submitted' | 'error'
 export default function WritePage() {
   const [authorName, setAuthorName] = useState('')
   const [title, setTitle] = useState('')
-  const [excerpt, setExcerpt] = useState('')
   const [body, setBody] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -39,7 +38,6 @@ export default function WritePage() {
       const fd = new FormData()
       fd.append('authorName', authorName)
       fd.append('title', title)
-      fd.append('excerpt', excerpt)
       fd.append('body', body)
       if (imageFile) fd.append('image', imageFile)
       const res = await fetch('/api/posts/create', { method: 'POST', body: fd })
@@ -67,7 +65,7 @@ export default function WritePage() {
           </a>
           <button
             onClick={() => {
-              setAuthorName(''); setTitle(''); setExcerpt(''); setBody('')
+              setAuthorName(''); setTitle(''); setBody('')
               setImageFile(null); setImagePreview(null); setSubmitStatus('idle')
             }}
             className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition"
@@ -166,25 +164,6 @@ export default function WritePage() {
             )}
           </div>
 
-          {/* Excerpt */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Short Summary
-              <span className="ml-2 text-xs font-normal text-gray-400">optional but recommended</span>
-            </label>
-            <textarea
-              value={excerpt}
-              onChange={(e) => setExcerpt(e.target.value)}
-              placeholder="A one or two sentence summary..."
-              rows={2}
-              maxLength={200}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none"
-            />
-            <div className="flex items-start justify-between mt-1">
-              <p className="text-xs text-gray-400">{excerpt.length}/200 characters</p>
-              <FieldToolbar value={excerpt} onChange={setExcerpt} />
-            </div>
-          </div>
 
           {/* Body */}
           <div>

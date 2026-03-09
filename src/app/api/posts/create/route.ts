@@ -41,24 +41,23 @@ function portableTextToPlain(blocks: Array<{ _type: string; children?: Array<{ t
     .join('\n\n')
 }
 
-async function translateContent(title: string, excerpt: string, bodyText: string, targetLanguage: string) {
+async function translateContent(title: string, bodyText: string, targetLanguage: string) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
     response_format: { type: 'json_object' },
     messages: [
       {
         role: 'system',
-        content: `You are a professional translator. Translate the given fields to ${targetLanguage}. Return a JSON object with fields: title, excerpt, body. Preserve paragraph breaks in body using double newlines.`,
+        content: `You are a professional translator. Translate the given fields to ${targetLanguage}. Return a JSON object with fields: title, body. Preserve paragraph breaks in body using double newlines.`,
       },
       {
         role: 'user',
-        content: JSON.stringify({ title, excerpt, body: bodyText }),
+        content: JSON.stringify({ title, body: bodyText }),
       },
     ],
   })
   return JSON.parse(completion.choices[0].message.content ?? '{}') as {
     title: string
-    excerpt: string
     body: string
   }
 }
@@ -68,7 +67,6 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const authorName = formData.get('authorName') as string
     const title = formData.get('title') as string
-    const excerpt = formData.get('excerpt') as string
     const body = formData.get('body') as string
     const imageFile = formData.get('image') as File | null
 
@@ -125,7 +123,6 @@ export async function POST(req: NextRequest) {
       _type: 'post',
       title,
       slug: { _type: 'slug', current: slugify(title) },
-      excerpt: excerpt || '',
       body: textToPortableText(body),
       author: { _type: 'reference', _ref: authorId },
       publishedAt: new Date().toISOString(),
@@ -139,7 +136,6 @@ export async function POST(req: NextRequest) {
     createTranslation({
       sourceId: post._id,
       title,
-      excerpt: excerpt || '',
       body,
       authorId,
       mainImage,
@@ -158,7 +154,6 @@ export async function POST(req: NextRequest) {
 async function createTranslation({
   sourceId,
   title,
-  excerpt,
   body,
   authorId,
   mainImage,
@@ -168,7 +163,6 @@ async function createTranslation({
 }: {
   sourceId: string
   title: string
-  excerpt: string
   body: string
   authorId: string
   mainImage: object | undefined
@@ -176,7 +170,7 @@ async function createTranslation({
   targetLocale: string
   siteUrl: string
 }) {
-  const translated = await translateContent(title, excerpt, body, targetLanguage)
+  const translated = await translateContent(title, body, targetLanguage)
 
   const translationId = `${sourceId}-${targetLocale}`
   const draftId = `drafts.${translationId}`
@@ -186,7 +180,6 @@ async function createTranslation({
     _type: 'post',
     title: translated.title,
     slug: { _type: 'slug', current: `${slugify(translated.title)}-${targetLocale}` },
-    excerpt: translated.excerpt || '',
     body: textToPortableText(translated.body),
     author: { _type: 'reference', _ref: authorId },
     publishedAt: new Date().toISOString(),
@@ -219,7 +212,7 @@ export async function PUT(req: NextRequest) {
     if (!postId) return NextResponse.json({ error: 'Missing postId' }, { status: 400 })
 
     const post = await client.fetch(
-      `*[_type == "post" && _id == $id][0]{ _id, title, excerpt, body, language, translationOf, author->{ _id }, mainImage }`,
+      `*[_type == "post" && _id == $id][0]{ _id, title, body, language, translationOf, author->{ _id }, mainImage }`,
       { id: postId }
     )
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
@@ -228,7 +221,7 @@ export async function PUT(req: NextRequest) {
     const targetLocale = post.language === 'en' ? 'zh' : 'en'
     const targetLanguage = targetLocale === 'zh' ? 'Simplified Chinese' : 'English'
 
-    const translated = await translateContent(post.title, post.excerpt ?? '', bodyText, targetLanguage)
+    const translated = await translateContent(post.title, bodyText, targetLanguage)
 
     // Determine target document id
     let targetId: string
@@ -245,7 +238,6 @@ export async function PUT(req: NextRequest) {
       _type: 'post',
       title: translated.title,
       slug: { _type: 'slug', current: targetLocale === 'zh' ? `${slugify(translated.title)}-zh` : slugify(translated.title) },
-      excerpt: translated.excerpt || '',
       body: textToPortableText(translated.body),
       author: { _type: 'reference', _ref: post.author._id },
       publishedAt: new Date().toISOString(),
