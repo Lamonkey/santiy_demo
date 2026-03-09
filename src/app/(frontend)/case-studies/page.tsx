@@ -6,6 +6,8 @@ import CaseStudyCard from '@/components/CaseStudyCard'
 export const metadata: Metadata = {
   title: 'Case Studies',
   description: 'Real-world projects and client work',
+  alternates: { canonical: '/case-studies' },
+  openGraph: { type: 'website' },
 }
 
 export default async function CaseStudiesPage() {

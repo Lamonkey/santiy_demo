@@ -10,6 +10,8 @@ import Image from 'next/image'
 
 type Props = { params: Promise<{ slug: string }> }
 
+export const dynamicParams = false
+
 const getPost = (params: Props['params'], stega = true) =>
   sanityFetch({ query: POST_QUERY, params: params as unknown as { slug: string }, stega })
 
@@ -19,15 +21,25 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const resolvedParams = await params
   const { data: post } = await getPost(params, false)
   if (!post) return {}
+  const ogImage = post.seo?.image
+    ? urlFor(post.seo.image).width(1200).height(630).url()
+    : post.mainImage?.asset
+      ? urlFor(post.mainImage).width(1200).height(630).url()
+      : undefined
   return {
     title: post.seo?.title || post.title,
     description: post.seo?.description || post.excerpt || undefined,
-    openGraph: post.seo?.image
-      ? { images: [{ url: urlFor(post.seo.image).width(1200).height(630).url() }] }
-      : undefined,
     robots: post.seo?.noIndex ? 'noindex' : undefined,
+    alternates: { canonical: `/blog/${resolvedParams.slug}` },
+    openGraph: {
+      type: 'article',
+      publishedTime: post.publishedAt ?? undefined,
+      authors: post.author?.name ? [post.author.name] : undefined,
+      images: ogImage ? [{ url: ogImage, width: 1200, height: 630 }] : undefined,
+    },
   }
 }
 

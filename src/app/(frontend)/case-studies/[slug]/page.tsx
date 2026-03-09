@@ -9,6 +9,8 @@ import Image from 'next/image'
 
 type Props = { params: Promise<{ slug: string }> }
 
+export const dynamicParams = false
+
 export async function generateStaticParams() {
   const slugs = await client.withConfig({ useCdn: false }).fetch(CASE_STUDY_SLUGS_QUERY)
   return slugs ?? []
@@ -18,10 +20,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const resolvedParams = await params
   const { data: cs } = await sanityFetch({ query: CASE_STUDY_QUERY, params: resolvedParams, stega: false })
   if (!cs) return {}
+  const ogImage = cs.seo?.image
+    ? urlFor(cs.seo.image).width(1200).height(630).url()
+    : cs.coverImage?.asset
+      ? urlFor(cs.coverImage).width(1200).height(630).url()
+      : undefined
   return {
     title: cs.seo?.title || cs.title,
     description: cs.seo?.description || cs.excerpt || undefined,
     robots: cs.seo?.noIndex ? 'noindex' : undefined,
+    alternates: { canonical: `/case-studies/${resolvedParams.slug}` },
+    openGraph: {
+      type: 'article',
+      images: ogImage ? [{ url: ogImage, width: 1200, height: 630 }] : undefined,
+    },
   }
 }
 

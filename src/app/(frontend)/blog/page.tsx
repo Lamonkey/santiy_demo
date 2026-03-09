@@ -13,9 +13,22 @@ import Link from 'next/link'
 
 const POSTS_PER_PAGE = 9
 
-export const metadata: Metadata = {
-  title: 'Blog',
-  description: 'Thoughts, tutorials and insights',
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; category?: string }>
+}): Promise<Metadata> {
+  const { page: pageParam, category: categorySlug } = await searchParams
+  const params = new URLSearchParams()
+  if (categorySlug) params.set('category', categorySlug)
+  if (pageParam && pageParam !== '1') params.set('page', pageParam)
+  const qs = params.toString()
+  return {
+    title: 'Blog',
+    description: 'Thoughts, tutorials and insights',
+    alternates: { canonical: qs ? `/blog?${qs}` : '/blog' },
+    openGraph: { type: 'website' },
+  }
 }
 
 export default async function BlogPage({

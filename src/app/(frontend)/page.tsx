@@ -14,6 +14,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: page.seo?.title || undefined,
     description: page.seo?.description || undefined,
     robots: page.seo?.noIndex ? 'noindex' : undefined,
+    alternates: { canonical: '/' },
+    openGraph: { type: 'website' },
   }
 }
 
