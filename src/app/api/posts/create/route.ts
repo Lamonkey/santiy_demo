@@ -41,23 +41,6 @@ function portableTextToPlain(blocks: Array<{ _type: string; children?: Array<{ t
     .join('\n\n')
 }
 
-async function generateSeo(title: string, bodyText: string): Promise<{ title: string; description: string }> {
-  const text = [title, bodyText].filter(Boolean).join('\n\n').slice(0, 3000)
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    response_format: { type: 'json_object' },
-    messages: [
-      {
-        role: 'system',
-        content: 'Generate an SEO meta title (max 60 characters) and meta description (max 155 characters). Return JSON with keys "title" and "description". Be factual, no marketing language.',
-      },
-      { role: 'user', content: text },
-    ],
-  })
-  const result = JSON.parse(completion.choices[0].message.content ?? '{}')
-  return { title: result.title ?? '', description: result.description ?? '' }
-}
-
 async function translateContent(title: string, bodyText: string, targetLanguage: string) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -135,11 +118,11 @@ export async function POST(req: NextRequest) {
       authorId = newAuthor._id
     }
 
-    // Generate SEO for English post
-    const seo = await generateSeo(title, body).catch(() => null)
-
-    // Create source (English) post — published immediately
-    const post = await client.create({
+    // Create as a draft first, then publish — the publish step triggers
+    // the auto-translate and auto-seo Blueprint Document Functions
+    const draftId = `drafts.${crypto.randomUUID()}`
+    await client.create({
+      _id: draftId,
       _type: 'post',
       title,
       slug: { _type: 'slug', current: slugify(title) },
@@ -148,85 +131,20 @@ export async function POST(req: NextRequest) {
       publishedAt: new Date().toISOString(),
       language: 'en',
       translationStatus: 'none',
-      ...(seo && { seo }),
       ...(mainImage && { mainImage }),
     })
 
-    // Auto-translate to Chinese in the background — don't block the response
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-    createTranslation({
-      sourceId: post._id,
-      title,
-      body,
-      authorId,
-      mainImage,
-      targetLanguage: 'Simplified Chinese',
-      targetLocale: 'zh',
-      siteUrl,
-    }).catch((err) => console.error('Translation failed:', err))
+    const publishedId = draftId.replace('drafts.', '')
+    await client.action({
+      actionType: 'sanity.action.document.publish',
+      draftId,
+      publishedId,
+    })
 
-    return NextResponse.json({ success: true, id: post._id })
+    return NextResponse.json({ success: true, id: publishedId })
   } catch (err) {
     console.error('Post creation error:', err)
     return NextResponse.json({ error: 'Failed to create post' }, { status: 500 })
-  }
-}
-
-async function createTranslation({
-  sourceId,
-  title,
-  body,
-  authorId,
-  mainImage,
-  targetLanguage,
-  targetLocale,
-  siteUrl,
-}: {
-  sourceId: string
-  title: string
-  body: string
-  authorId: string
-  mainImage: object | undefined
-  targetLanguage: string
-  targetLocale: string
-  siteUrl: string
-}) {
-  const [translated, translatedSeo] = await Promise.all([
-    translateContent(title, body, targetLanguage),
-    generateSeo(title, body).catch(() => null),
-  ])
-
-  const translationId = `${sourceId}-${targetLocale}`
-  const draftId = `drafts.${translationId}`
-
-  await client.createOrReplace({
-    _id: draftId,
-    _type: 'post',
-    title: translated.title,
-    slug: { _type: 'slug', current: `${slugify(translated.title)}-${targetLocale}` },
-    body: textToPortableText(translated.body),
-    author: { _type: 'reference', _ref: authorId },
-    publishedAt: new Date().toISOString(),
-    language: targetLocale,
-    translationOf: { _type: 'reference', _ref: sourceId },
-    translationStatus: 'pending_review',
-    ...(translatedSeo && { seo: translatedSeo }),
-    ...(mainImage && { mainImage }),
-  })
-
-  // Notify reviewer via webhook if configured
-  if (process.env.REVIEW_WEBHOOK_URL) {
-    await fetch(process.env.REVIEW_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: `New translation pending review: "${translated.title}" (${targetLocale.toUpperCase()})`,
-        studioUrl: `${siteUrl}/studio/structure/post;${draftId}`,
-        sourceTitle: title,
-        translatedTitle: translated.title,
-        language: targetLocale,
-      }),
-    }).catch(() => {}) // webhook failure should not surface to user
   }
 }
 

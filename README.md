@@ -64,6 +64,56 @@ src/
     └── structure/           # Custom Studio sidebar
 ```
 
+## Blueprints (Document Functions)
+
+Auto-translate and auto-SEO run as Sanity Document Functions deployed via Blueprints. They trigger on every `publish` event — no fire-and-forget, no Next.js API routes involved.
+
+| Function | Trigger | What it does |
+|---|---|---|
+| `auto-translate` | English post published, `translationStatus == 'none'` | Creates Chinese draft with `translationStatus: pending_review` |
+| `auto-seo` | Any post/landingPage published, `seo.title` empty | Generates SEO title + description via GPT-4o in the document's language |
+
+### First-time setup
+
+```bash
+# 1. Login
+npx sanity login
+
+# 2. Create a stack and link to your project
+npx sanity blueprints config
+
+# 3. Add secrets to sanity.blueprint.ts (never commit this file — it's in .gitignore)
+#    Set SANITY_PROJECT_ID, SANITY_DATASET, SANITY_WRITE_TOKEN, OPENAI_API_KEY
+
+# 4. Preview changes
+npx sanity blueprints plan
+
+# 5. Deploy
+npx sanity blueprints deploy
+```
+
+### Deploying changes
+
+```bash
+npx sanity blueprints deploy
+```
+
+### Checking status
+
+```bash
+npx sanity blueprints info    # see deployed functions and their config
+npx sanity blueprints logs    # infrastructure logs (deploy events only)
+```
+
+For function execution logs (errors, console output) — go to **sanity.io/manage → your project → Functions**.
+
+### Key gotchas
+
+- `sanity.blueprint.ts` contains secrets — it is gitignored. Each developer needs their own copy.
+- Env vars are **not** auto-injected. `SANITY_PROJECT_ID`, `SANITY_DATASET`, and all tokens must be declared explicitly in the `env` block.
+- The `publish` event only fires when going through the proper draft→publish flow via `client.action()`. Direct `client.create()` to a published ID does **not** trigger it.
+- To query draft documents created by Blueprint functions, use `?perspective=raw` on the Sanity API.
+
 ## Cache invalidation
 
 Sanity webhooks → `/api/revalidate/tag` → `revalidateTag()`. Pages also have a 60-second time-based fallback. Configure the webhook in sanity.io/manage pointing to `https://your-domain/api/revalidate/tag` with `SANITY_REVALIDATE_SECRET`.
