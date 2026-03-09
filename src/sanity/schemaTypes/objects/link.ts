@@ -30,7 +30,7 @@ export const linkType = defineType({
       name: 'internalRef',
       title: 'Internal Page',
       type: 'reference',
-      to: [{ type: 'post' }, { type: 'caseStudy' }],
+      to: [{ type: 'post' }],
       hidden: ({ parent }) => parent?.linkType !== 'internal',
     }),
     defineField({

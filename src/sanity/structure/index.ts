@@ -5,7 +5,6 @@ import {
   DocumentTextIcon,
   UserIcon,
   TagIcon,
-  ProjectsIcon,
 } from '@sanity/icons'
 
 const SINGLETONS = ['settings', 'landingPage']
@@ -41,14 +40,11 @@ export const structure: StructureResolver = (S) =>
             ])
         ),
 
-      // Case Studies
-      S.documentTypeListItem('caseStudy').title('Case Studies').icon(ProjectsIcon),
-
       S.divider(),
 
       // All other document types (filtered)
       ...S.documentTypeListItems().filter(
         (item) => !SINGLETONS.includes(item.getId() as string) &&
-          !['post', 'author', 'category', 'caseStudy'].includes(item.getId() as string)
+          !['post', 'author', 'category'].includes(item.getId() as string)
       ),
     ])
