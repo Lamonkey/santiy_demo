@@ -1,13 +1,25 @@
 import Link from 'next/link'
 
-export default function Pagination({ current, total }: { current: number; total: number }) {
+export default function Pagination({
+  current,
+  total,
+  basePath,
+}: {
+  current: number
+  total: number
+  basePath?: string
+}) {
   if (total <= 1) return null
+
+  function href(page: number) {
+    return basePath ? `${basePath}?page=${page}` : `?page=${page}`
+  }
 
   return (
     <nav className="flex items-center justify-center gap-2 mt-12">
       {current > 1 && (
         <Link
-          href={`?page=${current - 1}`}
+          href={href(current - 1)}
           className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition"
         >
           ← Previous
@@ -16,7 +28,7 @@ export default function Pagination({ current, total }: { current: number; total:
       {Array.from({ length: total }, (_, i) => i + 1).map((page) => (
         <Link
           key={page}
-          href={`?page=${page}`}
+          href={href(page)}
           className={`px-4 py-2 border rounded-lg transition ${
             page === current
               ? 'bg-blue-600 text-white border-blue-600'
@@ -28,7 +40,7 @@ export default function Pagination({ current, total }: { current: number; total:
       ))}
       {current < total && (
         <Link
-          href={`?page=${current + 1}`}
+          href={href(current + 1)}
           className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition"
         >
           Next →

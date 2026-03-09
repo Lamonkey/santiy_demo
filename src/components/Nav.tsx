@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 type Settings = {
   siteName?: string | null
@@ -28,6 +29,7 @@ export default function Nav({ settings }: { settings: Settings }) {
           <Link href="/blog" className="text-gray-600 hover:text-gray-900 transition text-sm">
             Blog
           </Link>
+          <LanguageSwitcher />
           {settings?.nav?.map((item, i) => (
             <a
               key={i}

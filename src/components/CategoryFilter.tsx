@@ -11,9 +11,11 @@ type Category = {
 export default function CategoryFilter({
   categories,
   activeSlug,
+  basePath = '/blog',
 }: {
   categories: Category[]
   activeSlug?: string
+  basePath?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -26,7 +28,7 @@ export default function CategoryFilter({
       params.delete('category')
     }
     params.delete('page')
-    router.push(`/blog?${params.toString()}`)
+    router.push(`${basePath}?${params.toString()}`)
   }
 
   return (

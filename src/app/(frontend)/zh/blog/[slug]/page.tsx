@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { POST_QUERY, POST_SLUGS_QUERY } from '@/sanity/lib/queries'
+import { POST_ZH_QUERY, POST_SLUGS_ZH_QUERY } from '@/sanity/lib/queries'
 import { urlFor } from '@/sanity/lib/image'
 import { client } from '@/sanity/lib/client'
 import PortableTextContent from '@/components/PortableTextContent'
@@ -17,13 +17,13 @@ const fetchClient = client.withConfig({
 })
 
 export async function generateStaticParams() {
-  const slugs = await fetchClient.fetch(POST_SLUGS_QUERY)
+  const slugs = await fetchClient.fetch(POST_SLUGS_ZH_QUERY)
   return slugs ?? []
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const resolvedParams = await params
-  const post = await fetchClient.fetch(POST_QUERY, resolvedParams)
+  const post = await fetchClient.fetch(POST_ZH_QUERY, resolvedParams)
   if (!post) return {}
   const ogImage = post.seo?.image
     ? urlFor(post.seo.image).width(1200).height(630).url()
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: post.seo?.description || post.excerpt || undefined,
     robots: post.seo?.noIndex ? 'noindex' : undefined,
     alternates: {
-      canonical: `/blog/${resolvedParams.slug}`,
+      canonical: `/zh/blog/${resolvedParams.slug}`,
       languages: {
         'en': `/blog/${resolvedParams.slug}`,
         'zh': `/zh/blog/${resolvedParams.slug}`,
@@ -50,9 +50,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default async function PostPage({ params }: Props) {
+export default async function ZhPostPage({ params }: Props) {
   const resolvedParams = await params
-  const post = await fetchClient.fetch(POST_QUERY, resolvedParams)
+  const post = await fetchClient.fetch(POST_ZH_QUERY, resolvedParams)
   if (!post) notFound()
 
   return (
@@ -73,24 +73,22 @@ export default async function PostPage({ params }: Props) {
       <header className="mb-8">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
           <div className="flex gap-2 flex-wrap">
-            {post.categories?.map((cat: { _id: string; title: string; slug: string }) => (
+            {post.categories?.map((cat: any) => (
               <a
                 key={cat._id}
-                href={`/blog?category=${cat.slug}`}
+                href={`/zh/blog?category=${cat.slug}`}
                 className="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-full"
               >
                 {cat.title}
               </a>
             ))}
           </div>
-          {post.translation?.slug && (
-            <a
-              href={`/blog/${post.translation.slug}`}
-              className="text-sm px-3 py-1.5 border border-gray-300 rounded-full text-gray-600 hover:border-gray-500 hover:text-gray-900 transition"
-            >
-              {post.language === 'zh' ? '🇺🇸 English' : '🇨🇳 中文'}
-            </a>
-          )}
+          <a
+            href={`/blog/${resolvedParams.slug}`}
+            className="text-sm px-3 py-1.5 border border-gray-300 rounded-full text-gray-600 hover:border-gray-500 hover:text-gray-900 transition"
+          >
+            🇺🇸 English
+          </a>
         </div>
         <h1 className="text-4xl font-bold mb-4">{post.title}</h1>
         {post.excerpt && <p className="text-xl text-gray-600">{post.excerpt}</p>}
@@ -111,7 +109,7 @@ export default async function PostPage({ params }: Props) {
             </div>
             {post.publishedAt && (
               <time className="ml-auto text-sm text-gray-500">
-                {new Date(post.publishedAt).toLocaleDateString('en-US', {
+                {new Date(post.publishedAt).toLocaleDateString('zh-CN', {
                   year: 'numeric', month: 'long', day: 'numeric',
                 })}
               </time>
@@ -124,7 +122,7 @@ export default async function PostPage({ params }: Props) {
 
       {post.aiSummary && (
         <aside className="mt-12 p-6 bg-gray-50 rounded-xl border">
-          <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500 mb-2">AI Summary</h2>
+          <h2 className="font-semibold text-sm uppercase tracking-wide text-gray-500 mb-2">AI 摘要</h2>
           <p className="text-gray-700">{post.aiSummary}</p>
         </aside>
       )}

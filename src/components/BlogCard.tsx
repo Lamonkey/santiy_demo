@@ -14,10 +14,10 @@ type Post = {
   categories?: Array<{ _id: string; title?: string | null; slug?: string | null }> | null
 }
 
-export default function BlogCard({ post }: { post: Post }) {
+export default function BlogCard({ post, basePath = '/blog' }: { post: Post; basePath?: string }) {
   return (
     <article className="group rounded-xl overflow-hidden border border-gray-100 hover:border-blue-200 transition">
-      <Link href={`/blog/${post.slug}`}>
+      <Link href={`${basePath}/${post.slug}`}>
         {post.mainImage?.asset && (
           <div className="relative aspect-video">
             <Image

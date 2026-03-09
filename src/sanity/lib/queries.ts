@@ -110,6 +110,7 @@ export const POST_QUERY = defineQuery(`
     _id,
     title,
     "slug": slug.current,
+    language,
     excerpt,
     publishedAt,
     featured,
@@ -124,12 +125,85 @@ export const POST_QUERY = defineQuery(`
     author->{ _id, name, role, "slug": slug.current, photo { ${imageFragment} }, bio, socialLinks },
     categories[]->{ _id, title, "slug": slug.current },
     aiSummary,
+    "translation": coalesce(
+      translationOf->{ "slug": slug.current, language },
+      *[_type == "post" && translationOf._ref == ^._id][0]{ "slug": slug.current, language }
+    ),
     ${seoFragment}
   }
 `)
 
 export const POST_SLUGS_QUERY = defineQuery(`
   *[_type == "post" && defined(slug.current) && (language == "en" || !defined(language))]{ "slug": slug.current }
+`)
+
+// Chinese blog listing — uses English canonical slugs for URLs
+export const POSTS_LIST_ZH_QUERY = defineQuery(`
+  *[_type == "post" && defined(slug.current) && language == "zh"] | order(publishedAt desc) [$start...$end] {
+    _id,
+    title,
+    "slug": coalesce(translationOf->slug.current, slug.current),
+    excerpt,
+    publishedAt,
+    featured,
+    mainImage { asset->{ _id, url, metadata { lqip, dimensions } }, alt },
+    author->{ name, "slug": slug.current, photo { asset->{ _id, url, metadata { lqip, dimensions } }, alt } },
+    categories[]->{ _id, title, "slug": slug.current }
+  }
+`)
+
+export const POSTS_COUNT_ZH_QUERY = defineQuery(`
+  count(*[_type == "post" && defined(slug.current) && language == "zh"])
+`)
+
+export const POSTS_BY_CATEGORY_ZH_QUERY = defineQuery(`
+  *[_type == "post" && defined(slug.current) && language == "zh" && $categorySlug in categories[]->slug.current]
+  | order(publishedAt desc) [$start...$end] {
+    _id,
+    title,
+    "slug": coalesce(translationOf->slug.current, slug.current),
+    excerpt,
+    publishedAt,
+    featured,
+    mainImage { asset->{ _id, url, metadata { lqip, dimensions } }, alt },
+    author->{ name, "slug": slug.current, photo { asset->{ _id, url, metadata { lqip, dimensions } }, alt } },
+    categories[]->{ _id, title, "slug": slug.current }
+  }
+`)
+
+// Find Chinese post by English canonical slug
+export const POST_ZH_QUERY = defineQuery(`
+  *[_type == "post" && translationOf->slug.current == $slug && language == "zh"][0]{
+    _id,
+    title,
+    "slug": translationOf->slug.current,
+    language,
+    excerpt,
+    publishedAt,
+    featured,
+    mainImage { asset->{ _id, url, metadata { lqip, dimensions } }, alt },
+    body[]{
+      ...,
+      _type == "image" => {
+        ...,
+        asset->{ _id, url, metadata { lqip, dimensions } }
+      }
+    },
+    author->{ _id, name, role, "slug": slug.current, photo { asset->{ _id, url, metadata { lqip, dimensions } }, alt }, bio, socialLinks },
+    categories[]->{ _id, title, "slug": slug.current },
+    aiSummary,
+    "seo": {
+      "title": coalesce(seo.title, title, ""),
+      "description": coalesce(seo.description, excerpt, ""),
+      "image": seo.image,
+      "noIndex": seo.noIndex == true
+    }
+  }
+`)
+
+// Slugs of Chinese posts (using English canonical slug)
+export const POST_SLUGS_ZH_QUERY = defineQuery(`
+  *[_type == "post" && language == "zh" && defined(translationOf->slug.current)]{ "slug": translationOf->slug.current }
 `)
 
 // Categories
