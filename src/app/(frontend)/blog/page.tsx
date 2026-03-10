@@ -6,6 +6,7 @@ import {
   POSTS_COUNT_QUERY,
   CATEGORIES_QUERY,
 } from '@/sanity/lib/queries'
+import type { POSTS_LIST_QUERYResult, POSTS_COUNT_QUERYResult, CATEGORIES_QUERYResult } from '@/../sanity.types'
 import BlogCard from '@/components/BlogCard'
 import Pagination from '@/components/Pagination'
 import CategoryFilter from '@/components/CategoryFilter'
@@ -48,7 +49,7 @@ export default async function BlogPage({
   const start = (page - 1) * POSTS_PER_PAGE
   const end = start + POSTS_PER_PAGE
 
-  const [posts, total, categories] = await Promise.all([
+  const [posts, total, categories]: [POSTS_LIST_QUERYResult, POSTS_COUNT_QUERYResult, CATEGORIES_QUERYResult] = await Promise.all([
     fetchClient.fetch(
       categorySlug ? POSTS_BY_CATEGORY_QUERY : POSTS_LIST_QUERY,
       categorySlug ? { categorySlug, start, end } : { start, end },

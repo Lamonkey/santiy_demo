@@ -16,7 +16,7 @@ export default async function FrontendLayout({ children }: { children: React.Rea
       <Nav settings={settings} />
       <main>{children}</main>
       <SanityLive />
-      {isDraft && <VisualEditing studioUrl="/studio" />}
+      {isDraft && <VisualEditing />}
     </>
   )
 }

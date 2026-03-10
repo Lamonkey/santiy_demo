@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next'
 import { client } from '@/sanity/lib/client'
 import { SITEMAP_QUERY } from '@/sanity/lib/queries'
+import type { SITEMAP_QUERYResult } from '@/../sanity.types'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.VERCEL_URL
@@ -8,7 +9,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     : 'http://localhost:3000'
 
   try {
-    const paths = await client.fetch(SITEMAP_QUERY)
+    const paths: SITEMAP_QUERYResult = await client.fetch(SITEMAP_QUERY)
     if (!paths) return []
 
     return [

@@ -34,7 +34,7 @@ export function GenerateSeoAction(props: DocumentActionProps) {
 
   if (!['post', 'landingPage'].includes(type)) return null
 
-  const doc = draft ?? published
+  const doc = (draft ?? published) as Record<string, any> | null
   const hasSeo = doc?.seo?.title || doc?.seo?.description
 
   return {

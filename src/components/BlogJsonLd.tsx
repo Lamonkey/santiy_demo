@@ -6,7 +6,7 @@ type Post = {
   title?: string | null
   excerpt?: string | null
   publishedAt?: string | null
-  mainImage?: { asset?: unknown } | null
+  mainImage?: { asset?: object | null } | null
   author?: { name?: string | null } | null
 }
 

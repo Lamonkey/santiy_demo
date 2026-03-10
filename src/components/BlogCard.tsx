@@ -9,8 +9,8 @@ type Post = {
   excerpt?: string | null
   publishedAt?: string | null
   featured?: boolean | null
-  mainImage?: { asset?: { url?: string; metadata?: { lqip?: string } } | null; alt?: string | null } | null
-  author?: { name?: string | null; photo?: { asset?: { url?: string } | null } | null } | null
+  mainImage?: { asset?: { url?: string | null; metadata?: { lqip?: string | null } | null } | null; alt?: string | null } | null
+  author?: { name?: string | null; photo?: { asset?: { url?: string | null } | null } | null } | null
   categories?: Array<{ _id: string; title?: string | null; slug?: string | null }> | null
 }
 

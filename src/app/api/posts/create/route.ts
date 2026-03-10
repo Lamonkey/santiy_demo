@@ -80,14 +80,14 @@ export async function POST(req: NextRequest) {
     // Upload image if provided
     let mainImage: object | undefined
     if (imageFile && imageFile.size > 0) {
-      let buffer = Buffer.from(await imageFile.arrayBuffer())
+      let buffer = Buffer.from(await imageFile.arrayBuffer()) as Buffer<ArrayBuffer>
       let contentType = imageFile.type
       const TEN_MB = 10 * 1024 * 1024
       if (buffer.byteLength > TEN_MB) {
         buffer = await sharp(buffer)
           .resize({ width: 2400, withoutEnlargement: true })
           .webp({ quality: 82 })
-          .toBuffer()
+          .toBuffer() as Buffer<ArrayBuffer>
         contentType = 'image/webp'
       }
       const asset = await client.assets.upload('image', buffer, {
