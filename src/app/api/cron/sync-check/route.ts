@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@sanity/client'
 
-const client = createClient({
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!,
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
-  apiVersion: '2026-02-01',
-  token: process.env.SANITY_API_WRITE_TOKEN,
-  useCdn: false,
-})
-
 type PostWithTranslation = {
   _id: string
   _updatedAt: string
@@ -23,6 +15,14 @@ type PostWithTranslation = {
 }
 
 export async function GET(req: NextRequest) {
+  const client = createClient({
+    projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID!,
+    dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
+    apiVersion: '2026-02-01',
+    token: process.env.SANITY_API_WRITE_TOKEN,
+    useCdn: false,
+  })
+
   // Verify this is called by Vercel Cron or a trusted caller
   const authHeader = req.headers.get('authorization')
   if (
