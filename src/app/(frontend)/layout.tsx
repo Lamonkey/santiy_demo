@@ -1,6 +1,6 @@
 import { SanityLive } from '@/sanity/lib/live'
 import { draftMode } from 'next/headers'
-import { VisualEditing } from 'next-sanity/visual-editing/client-component'
+import VisualEditing from 'next-sanity/visual-editing/client-component'
 import { SETTINGS_QUERY } from '@/sanity/lib/queries'
 import { client } from '@/sanity/lib/client'
 import Nav from '@/components/Nav'
